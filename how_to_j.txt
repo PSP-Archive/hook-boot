@@ -1,0 +1,177 @@
+hookboot.iniの書き方、使い方 V0.94
+
+V0.94
+  ISO9660エミュレーションについて追記
+
+V0.93
+  UMD EMULATIONから、sceKernelCreateCallbackを削除
+
+V0.92:
+  IMPORT_VERが追加
+V0.91:
+  V0.90のINIファイルとは、一部互換性がありません。
+
+　一番最初にhook boot起動ディレクトリ内のhook_boot.iniが参照される。
+
+１．"#[comment]"
+　コメント行、なにもしない。
+
+2."TITLE=[game_name]"
+　HOOK BOOT起動時に表示するメッセージ
+　スペース使用不可
+
+3."PATH_ASSIGN=[search_str],[replace_str]"
+　パス名の置き換え定義
+
+　[search_str]が頭から一致する部分を[replace_str]で置き換える。
+　[replace_str]に':'を含まない場合、hook boot起動ディレクトリが頭に
+付加されて、相対パス指定になる。
+
+　通常は、
+PATH_ASSIGN=disc0:/,UMD0/
+　でUMDがhook boot起動ディレクトリ下"UMD0/"にリダイレクトされるが、
+絶対パスでアクセスしないものなどは個別対策が必要。
+
+　定義の総文字数に制限あり。
+
+　複数指定可、最初に指定したもが最初に検索される。
+　一度置き換えると、以後の指定は検索しない。
+
+　ムービーをつぶす場合
+PATH_ASSIGN=disc0:/PSP_GAME/USRDIR/movie/ending.pmf,fatms0:/dummy.pmf
+PATH_ASSIGN=disc0:/,UMD0/
+　などとする。(未確認）
+
+　V0.94で追加
+　　置き換えパス".ISO"があると、UMDモードになる。
+　　"@"があるときは、IS9600ファイルシステムで、@以前をISO9660ファイルと見なし、
+　@以降をそのISOファイル内から検索する。
+　　"@"がないとき、ブロックアクセスモードになる。
+
+4."TARGET_PATH=[boot_target_path]"
+　起動するプログラムのファイルを指定する。
+　':'を含まない場合、hook boot起動ディレクトリが頭に付加されて、
+相対パス指定になる。
+
+　通常は、
+TARGET_PATH=UMD0/PSP_GAME/SYSDIR/BOOT.BIN
+
+　V0.94で追加：
+　　置き換えパスに@を含めると、@以前をISO9660ファイルと見なし、
+@以降をそのISOファイル内から検索する。
+
+5."PATCH_PATH=[patched_file_path]"
+　事前パッチを当てたファイルをセーブ＆起動するファイル
+　':'を含まない場合、hook boot起動ディレクトリが頭に付加されて、
+相対パス指定になる。
+
+　通常は、
+PATCH_PATH=boot_p.bin
+
+　対象APIは
+scrLoadModule
+sceIoOpen
+sceIoOpenAsync
+sceIoDopen
+sceIoChdir
+sceIoGetstat
+sceIoSync
+sceIoChstat
+sceIoDevctl
+　APIをフックすると機能する。
+
+　モジュールフックかターゲットにISO内ファイルを指定すると必要。
+　両方ないときは、パッチファイルは作られない。
+
+5."UMD_EMU=[emulation_on 0/1]"
+　UMDの状態をエミュレーションするとき１にする。
+　UMDを使って試験起動させるとき０にする。(動作未確認)
+
+  UMD_EMU=1の時のエミュレーション動作は、
+
+  sceUmdCheckMedium：戻り値１固定
+  sceUmdActivate   ：偽装Status=0x22
+  sceUmdDeactivate ：偽装Status=0x0A
+  sceUmdGetDriveStat:偽装Statusを返す。
+　sceUmdWaitDriveStat,sceUmdWaitDriveStatWithTimer,sceUmdWaitDriveStatCB即リターン
+  sceUmdRegisterUMDCallBack:登録をせず、偽装Stat変化時に呼び出す。
+
+　エミュ時には、上記UMD関連APIをフックする必要がある。
+
+6."LOG_DEVICE=[device DISP/FILE]"
+　フックしたAPIログを出力するデバイスの選択
+　FILEを指定した場合、"fatms0:/LOG.txt"に記録される。
+
+7."NID=[nid HEX],[mode N/M/S]"
+　フックするSYSCALLを１６進数NIDで指定する。NIDをffffffffにすると、
+全NIDが対象となる。
+　mode はNでフックなし、Mでモジュールフック,SでSYSCALLフック
+
+　モジュールフック＝対象プログラムだけフック
+　SYSCALLフック＝すべてのシステムコールをフック
+
+　SYSCALLフックには、SYSCALL_VECTORの設定が必修
+　モジュールフックのダウンVerには、１つ以上のモジュールフックが必要
+　モジュールフックが０個だと、事前パッチは行わない。
+
+　複数指定可、後の定義のほうが優先度が高い
+
+　NID=55555555だけHOOKせず、それ以外をモジュールフックする場合、
+NID=ffffffff,M
+NID=55555555,N
+　とする。
+
+　フックサポート済みで、対象プログラムが参照しているSYSCALLの一覧は、
+全NIDをモジュールフックでFILEにログをとると、ログからNID文法の形式で
+取得できる。それをコピペして、無駄なものを削除する。
+　または、SYSCALLフックを試す。
+
+　NID指定を変更したら、PATCH_PATHのファイルを手動削除することが必要
+
+8."SYSCALL_VECTOR=[vector_addr],[devkitver]"
+
+　SYSCALLフック時の、ジャンプテーブルのベースアドレスの指定。
+　SYSCALLフックを使う場合に必要、またdevkit verのパッチにも必要
+
+　PSP側のバージョンと[devkitver]が一致した値が適用される。
+　アドレスの整合性チェックも一応行っているが、正しく指定すること。
+
+　通常は、
+SYSCALL_VECTOR=8801b530,01010300  #Firmware Ver.1.00
+SYSCALL_VECTOR=8801e830,01050001  #Firmware Ver.1.50 no-check
+　となるはず。
+
+9."DEVKIT_VER=[devkit_ver]"
+　sceDevkitVersionが返すバージョンコードを変更する。
+　SYSCALL_VECTORの指定が必要。
+　これはフックではなく、カーネルを直パッチする。
+　普通は不要なので、指定しない。
+
+9."KPATCH=[address],[org_value],[value],[devkit_ver]
+
+　PSPのFWバージョンと、[devkitver]が一致して、
+　[address]のメモリ内容が[org_value]のとき[value]で
+置き換える。カーネルパッチテスト用途
+
+10."CONFIG_PATH=[ini_file_path]"
+　現在のINIファイルが終了したあと、[ini_file_path]のファイルを
+INIファイルとして続けて読み込む。
+　複数指定不可、最後の定義が有効
+
+　通常は、SYSCALLベクタやログなど、共通設定ファイルへリンクする。
+
+11."IMPORT_VER=[target_ver],[patch_ver]"
+　インポートライブラリのバージョンにパッチを当てる。
+　1.50のソフトを1.00で起動するために使う。(IMPORT_VER=11,00)
+　パッチはメモリ直接書き換えで行われ、
+　　１）カーネルメモリ
+　　２）ユーザーメモリの尻2MB（見つかった場合、128KB追加検索）
+　　３）ユーザーメモリの頭22MB
+　の順番で検索する。大量検索なのでそれなりの時間を要する。
+
+　1.52->1.50や1.52->1.00も可能かもしれない。
+　その場合、BOOT.BINから、[target_ver]を取得すべし。
+
+12."WAIT_RUN=[wait_mode]"
+  0で自動実行,1で実行前にCIRCLEボタン待ち
+

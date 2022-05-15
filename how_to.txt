@@ -1,0 +1,34 @@
+hookboot.ini V0.93
+
+1.PATH replace
+
+target API are
+scrLoadModule
+sceIoOpen
+sceIoOpenAsync
+sceIoDopen
+sceIoChdir
+sceIoGetstat
+sceIoSync
+sceIoChstat
+sceIoDevctl
+
+2.UMD EMULATION
+
+sceUmdCheckMediumÅFalways return 1
+sceUmdActivate   :the emulated UMD status set 0x22
+sceUmdDeactivate :the emulated UMD status set 0x0A
+sceUmdGetDriveStat:return the emulated UMD status.
+sceUmdWaitDriveStat,sceUmdWaitDriveStatWithTimer,sceUmdWaitDriveStatCB:return;
+sceUmdRegisterUMDCallBack:no register.When the emulated UMD status changes,CALLBACK is called directly. 
+
+3.ISO9660 EMULATION
+  case "fatms0:/PSP/GAME/ISO/UMD.ISO@PSP_GAME/SYSDIR/BOOT.BIN"
+  open file is "fatms0:/PSP/GAME/ISO/UMD.ISO" for open.
+  seek point is offset to "PSP_GAME/SYSDIR/BOOT.BIN" in ISO9660 image.
+
+3.LoadModule fix
+
+sceKernelLoadModuleByID
+scrLoadModule
+
